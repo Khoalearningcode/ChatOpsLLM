@@ -12,7 +12,7 @@ spec:
   #   - 0.0.0.0.nip.io
   #   secretName: webui-tls
   rules:
-  - host: 34.124.168.56.nip.io
+  - host: 35.240.180.101.nip.io
     http:
       paths:
       - path: /

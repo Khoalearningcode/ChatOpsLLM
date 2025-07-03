@@ -8,10 +8,10 @@
         # Refer to https://cloud.google.com/compute/docs/images/os-details#ubuntu_lts
         # or use the command `gcloud compute images list --project=ubuntu-os-cloud`
         zone: us-central1-a
-        project: llmops-464710
+        project: llmops-290705
         # The service account is needed to create the resources
         auth_kind: serviceaccount
-        service_account_file: ../secrets/llmops-464710-0531bf86d92a.json
+        service_account_file: ../secrets/llmops-290705-bf666023fb31.json
         disks:
           - auto_delete: true
             boot: true
@@ -40,6 +40,6 @@
           - 0.0.0.0/0 # Allow traffic from any source (use a more specific source range for security)
         direction: INGRESS # Direction from outside to inside, EGRESS is the opposite direction
         description: Allow incoming traffic on port 30000
-        project: llmops-464710
+        project: llmops-290705
         auth_kind: serviceaccount
-        service_account_file: ../secrets/llmops-464710-0531bf86d92a.json
+        service_account_file: ../secrets/llmops-290705-bf666023fb31.json

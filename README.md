@@ -107,6 +107,8 @@ terraform init
   terraform apply
   ```
 
+  On the GCP UI click on the gke then Connect and paste it into the terminal
+
 **2. <a name="retrieve-cluster-information"></a>Retrieve Cluster Information:**
 
 To interact with your GKE cluster, you'll need to retrieve its configuration. You can view the current cluster configuration with the following command:
@@ -132,7 +134,11 @@ The Nginx Ingress Controller manages external access to services in your Kuberne
 kubectl create ns nginx-system
 kubens nginx-system
 helm upgrade --install nginx-ingress ./deployments/nginx-ingress
+kubectl get pods
+kubectl get svc
 ```
+
+`kubeclt get svc` to check if there is EXTERNAL_IP
 
 Please story the Nginx Ingress Controller's IP address, as you'll need it later.
 
@@ -144,10 +150,10 @@ Store your environment variables, such as API keys, securely in Kubernetes secre
 
 ```bash
 kubectl create ns model-serving
-kubens model-serving
-kubectl delete secret ChatOpsLLM-env 
-kubectl create secret generic ChatOpsLLM-env --from-env-file=.env -n model-serving
-kubectl describe secret ChatOpsLLM-env -n model-serving
+kubens model-serving 
+kubectl create secret generic llmops-env --from-env-file=.env -n model-serving
+kubectl describe secret llmops-env -n model-serving
+kubectl delete secret llmops-env
 ```
 
 https://github.com/user-attachments/assets/fab6aa93-2f68-4f36-a4d8-4a1d955596f2
@@ -172,7 +178,10 @@ Now, deploy the semantic caching service using Redis:
 cd ./deployments/redis
 helm dependency build
 helm upgrade --install redis .
+kubectl get pods
+kubectl logs <name>
 ```
+`kubectl get pods` to check if there is all running (3 pods)
 
 https://github.com/user-attachments/assets/ef37626a-9a98-473e-a7e0-effcaa262ad5
 
@@ -183,7 +192,10 @@ Deploy the [LiteLLM](https://github.com/BerriAI/litellm) service:
 ```bash
 kubens model-serving
 helm upgrade --install litellm ./deployments/litellm
+kubectl get pods
+kubectl logs <name>
 ```
+`kubectl logs litellm` to check the log if there is no error
 
 https://github.com/user-attachments/assets/0c98fe90-f958-42fc-9fa6-224dcf417e29
 
@@ -192,10 +204,18 @@ https://github.com/user-attachments/assets/0c98fe90-f958-42fc-9fa6-224dcf417e29
 
 Next, Deploy the web UI to your GKE cluster:
 
+
+
 ```bash
 cd open-webui
+kubens model-serving
+docker build -t godminhkhoa/open-webui:latest .
+docker login
+docker push godminhkhoa/open-webui:latest
 kubectl apply -f ./kubernetes/manifest/base -n model-serving
 ```
+
+``kubectl get ingress -A` to get the EXTERNAL-IP then click in open-webui/kubernetes/manifest/base/webui-ingress.yaml to change the host
 
 https://github.com/user-attachments/assets/60ad30e3-e8f8-49a6-ab96-d895fe7986cb
 
@@ -203,6 +223,11 @@ https://github.com/user-attachments/assets/60ad30e3-e8f8-49a6-ab96-d895fe7986cb
 **7. <a name="play-around-with-the-application"></a>Play around with the Application:**
 
 Open browser and navigate to the URL of your GKE cluster (e.g. `http://172.0.0.0` in step 1) and add `.nip.io` to the end of the URL (e.g. `http://172.0.0.0.nip.io`). You should see the Open WebUI:
+
+```bash
+kubens nginx-system
+kubectl get svc
+```
 
 https://github.com/user-attachments/assets/4115a1f0-e513-4c58-a359-1d49683905a8
 
@@ -212,7 +237,16 @@ For automated CI/CD pipelines, use Jenkins and Ansible as follows:
 
 **1. <a name="set-up-jenkins-server"></a>Set up Jenkins Server:**
 
-First, create a Service Account and assign it the `Compute Admin` role. Then create a Json key file for the Service Account and store it in the `iac/ansible/secrets` directory.
+First, create a Service Account (IAM/Service Account) and assign it the `Compute Admin` role. Then create a Json key file for the Service Account and store it in the `iac/ansible/secrets` directory.
+
+The account name: ansible-sa
+Role: Compute Admin
+
+Create the ssh key by the way below-below
+
+Action -> Manage Key -> Add Key -> Create new key -> JSON -> Downloads -> Bring it to iac/ansible/secrets
+Then change the path in deploy_jenkins -> create_compute
+Change the name project too
 
 Next create a Google Compute Engine instance named "jenkins-server" running Ubuntu 22.04 with a firewall rule allowing traffic on ports 8081 and 50000.
 
@@ -222,7 +256,17 @@ ansible-playbook iac/ansible/deploy_jenkins/create_compute_instance.yaml
 
 Deploy Jenkins on a server by installing prerequisites, pulling a Docker image, and creating a privileged container with access to the Docker socket and exposed ports 8081 and 50000.
 
+Go to iac/ansible/inventory
+Take the External IP of jenkins-server on VM instance of GCP then paste into it and path to ssh key
+
+
+
 ```bash
+cd jenkins
+docker build -t godminhkhoa/jenkins-k8s:lts-jdk17 .
+docker login
+docker push godminhkhoa/jenkins-k8s:lts-jdk17
+cd ../
 ansible-playbook -i iac/ansible/inventory iac/ansible/deploy_jenkins/deploy_jenkins.yaml
 ```
 
@@ -235,9 +279,12 @@ To access the Jenkins server through SSH, we need to create a public/private key
 
 ```bash
 ssh-keygen
+cat <path>
 ```
+Take the path and go to metadat on GCP -> SSH key
 
 Open `Metadata` and copy the `ssh-keys` value.
+
 
 https://github.com/user-attachments/assets/8fd956be-d2db-4d85-aa7c-f78df160c00c
 
@@ -249,10 +296,16 @@ ssh <USERNAME>:<EXTERNAL_IP>
 
 Then run the following command to get the password:
 
+Take the external-IP of the jenkins-server on VM instance then add :8081
+
+
 ```bash
+ssh external ip
 sudo docker exec -it jenkins-server bash
 cat /var/jenkins_home/secrets/initialAdminPassword
 ```
+Take to the Jenkins UI 
+Install Plugin
 
 https://github.com/user-attachments/assets/08cb4183-a383-4dd2-89e3-da6e74b92d04
 
@@ -267,6 +320,8 @@ https://github.com/user-attachments/assets/4f0d3287-39ec-40e7-b333-9287ee37f9fc
 **3. <a name="install-jenkins-plugins"></a>Install Jenkins Plugins:**
 
 Install the following plugins to integrate Jenkins with Docker, Kubernetes, and GKE:
+
+Manage Jenkins -> Plugins
 
 - Docker
 - Docker Pipeline
@@ -285,7 +340,7 @@ https://github.com/user-attachments/assets/923f7aff-3983-4b3d-8ef5-17d2285aed63
 
 4.1. Add webhooks to your GitHub repository to trigger Jenkins builds.
 
-Go to the GitHub repository and click on `Settings`. Click on `Webhooks` and then click on `Add Webhook`. Enter the URL of your Jenkins server (e.g. `http://<EXTERNAL_IP>:8081/github-webhook/`). Then click on `Let me select individual events` and select `Let me select individual events`. Select `Push` and `Pull Request` and click on `Add Webhook`.
+Go to the GitHub repository and click on `Settings`. Click on `Webhooks` and then click on `Add Webhook`. Enter the URL of your Jenkins server (e.g. `http://<EXTERNAL_IP>:8081/github-webhook/`). Content type `application/json`. Then click on `Let me select individual events` and select `Let me select individual events`. Select `Push` and `Pull Request` and click on `Add Webhook`.
 
 https://github.com/user-attachments/assets/d6ec020a-3e93-4ce8-bf80-b9f63b227635
 
